@@ -7,7 +7,7 @@ Dictionary<string, List<string>> gamesMap = new(){
 
 Dictionary<string, List<string>> subscriptionMap = new(){
     {"silver", new List<string> (){"EA FC 24", "WWE 2k24"}},
-    {"platinum", new List<string> (){"EA FC 24", "WWE 2k24, F1 2024", "NBA 2k24", "PGA tour 23"}}
+    {"platinum", new List<string> (){"EA FC 24", "WWE 2k24", "F1 2024", "NBA 2k24", "PGA tour 23"}}
 };
 
 
@@ -24,21 +24,18 @@ app.MapGet("/playergames", () => gamesMap)
     });
 
 app.MapGet("/mygames", (ClaimsPrincipal user) => {
-    var hasClaim = user.HasClaim(claim => claim.Type == "subscription");
-
-    if(hasClaim){
-        var subscriptions  = user.FindFirstValue("subscription") ?? throw new Exception("Claim has no value!");
-        return Results.Ok(subscriptionMap[subscriptions]);
+    var subscription = user.FindFirstValue("subscription");
+    if (subscription is not null)
+    {
+        return subscriptionMap.TryGetValue(subscription, out var available)
+            ? Results.Ok(available)
+            : Results.Forbid();
     }
 
-    ArgumentNullException.ThrowIfNull(user.Identity?.Name);
-    var username = user.Identity.Name;
-
-    if(!gamesMap.ContainsKey(username)){
-        return Results.Empty;
-    }
-
-    return Results.Ok(gamesMap[username]);
+    var username = user.Identity?.Name;
+    return username is not null && gamesMap.TryGetValue(username, out var games)
+        ? Results.Ok(games)
+        : Results.Ok(Array.Empty<string>());
 }).RequireAuthorization(policy => {
         policy.RequireRole("player");
     });
